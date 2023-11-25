@@ -13,6 +13,11 @@ knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
 cat("\014")  # clean the console
 ```
+```{r}
+library(ranger)  # Random Forest
+library(glmnet)  # elastic net
+library(kernlab) # SVM
+```
 
 ```{r}
 library(dplyr)
@@ -80,7 +85,7 @@ model <- train(
   #method = "ranger", # 
   #method = "glmnet", # 
   #method =  catboost.caret, # for catboost
-  method = "svmRadial", # for support vector machines
+  method = "svmRadial", # for support vector machines install kernlab
   trControl = ctrl,
   #tuneGrid = expand.grid(alpha = 0.5, lambda = 0.1), # Elastic Net (alpha=0.5)
   tuneGrid = expand.grid(C = c(0.1,0.5,0.25), sigma = c(0.007, 0.02, 0.1, 0.005)), # for SVM
