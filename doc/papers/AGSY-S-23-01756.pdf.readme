@@ -1,0 +1,1 @@
+Este nuevo paper es un ejemplo de los que les decia que si separan en training and testing, pero porque tienen muchos miles de sistemas para usar. Asi y todo usan ratio 9:1. "This dataset was then randomly divided into training (including validation) and testing sets, with a ratio of 9: 1." https://doi.org/10.1016/j.mtla.2023.101966
