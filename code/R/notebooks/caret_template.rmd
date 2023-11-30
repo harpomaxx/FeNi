@@ -1,6 +1,5 @@
-
 ---
-title: "Regression Model using Elastic Net for FeNi"
+title: "Regression Model using Caret FeNi"
 output: html_notebook
 ---
 
@@ -14,9 +13,19 @@ rm(list = ls())
 cat("\014")  # clean the console
 ```
 ```{r}
-library(ranger)  # Random Forest
-library(glmnet)  # elastic net
-library(kernlab) # SVM
+library(ranger)   # Random Forest
+library(glmnet)   # elastic net
+library(kernlab)  # SVM
+
+```
+https://catboost.ai/en/docs/installation/r-installation-binary-installation
+
+```{r eval=FALSE, include=FALSE}
+#install.packages('devtools')
+devtools::install_url('https://github.com/catboost/catboost/releases/download/v1.2.2/catboost-R-Linux-1.2.2.tgz', INSTALL_opts = c("--no-multiarch", "--no-test-load"))
+```
+```{r}
+library(catboost)
 ```
 
 ```{r}
@@ -63,11 +72,11 @@ Using the glmnet package, we'll predict the `tmg` feature
 ```{r}
 # Define the control parameters for training
 ctrl <- trainControl(method = "cv", 
-                     number = 10, # 10-fold cross-validation
+                     number = 5, # 10-fold cross-validation
                      returnResamp = 'final',
                      savePredictions = 'final',
                      verboseIter = F,
-                     allowParallel = T
+                     allowParallel = F
                      )
 ```
 
@@ -76,8 +85,43 @@ The caret's train function sometimes requires to be adapted to the algorithm use
 
 [info for range parameters](https://stackoverflow.com/questions/48334929/r-using-ranger-with-caret-tunegrid-argument)
 
+
+### Define a grid for parameter tuning for catboost
+This should be adapted for each algorithm
+
 ```{r}
-# Train the Elastic Net model with caret
+# Define the parameter grid
+catboostgrid <- expand.grid(
+  # Maximum depth of trees. Deeper trees can model more complex relationships, 
+  # but risk overfitting and require more data and time to train.
+  depth = c(6, 8, 10),
+
+  # Learning rate, or shrinkage factor. This parameter scales the contribution of each tree. 
+  # Lower values can achieve better performance but require more trees.
+  learning_rate = c(0.01, 0.1),
+
+  # Maximum number of trees to be built, or the number of boosting steps. More iterations lead to a more complex model, 
+  # but also increase the risk of overfitting and the time to train the model.
+  iterations = c(100, 200),
+
+  # L2 regularization term for the cost function. This parameter applies a penalty 
+  # for complexity in the structure of the individual trees. Higher values make the model more conservative.
+  l2_leaf_reg = c(1, 3),
+
+  # Fraction of features to be used for each tree, a technique to reduce 
+  # overfitting and speed up training.
+  rsm = c(0.8, 1),
+
+  # Number of splits considered for each feature. Higher values can lead to finer splits, but are more computationally expensive.
+  border_count = c(32, 64)
+)
+
+```
+
+
+### Caret for other models
+```{r}
+# Train the  model with caret
 model <- train(
   tmg ~ ., # Define the formula
   
@@ -87,8 +131,9 @@ model <- train(
   #method =  catboost.caret, # for catboost
   method = "svmRadial", # for support vector machines install kernlab
   trControl = ctrl,
-  #tuneGrid = expand.grid(alpha = 0.5, lambda = 0.1), # Elastic Net (alpha=0.5)
+  # tuneGrid = expand.grid(alpha = 0.5, lambda = 0.1), # For Elastic Net (alpha=0.5)
   tuneGrid = expand.grid(C = c(0.1,0.5,0.25), sigma = c(0.007, 0.02, 0.1, 0.005)), # for SVM
+  #tuneGrid = grid, # for catboost
   #tunelength = 2,
   preProcess = c("center", "scale") # Standardization
   #importance = "permutation" #  parameter used for ranger
@@ -97,7 +142,26 @@ model <- train(
 # Print the 
 print(model)
 ```
+### Caret for catboost
 
+The Caret  wrapper for catboost does not support the formula interface, 
+```{r}
+# Train the  model with caret
+model <- train(
+  x = train_data %>% select(-tmg),
+  y = train_data$tmg,
+  #data = train_data,
+  method =  catboost.caret,
+  trControl = ctrl,
+  #tuneGrid = catboostgrid, # for catboost
+  #tunelength = 2,
+  preProcess = c("center", "scale") # Standardization
+  verbose = FALSE,
+)
+
+# Print the 
+print(model)
+```
 
 ## CV results
 Note: This code should be adapted according to the hyperparameters used by the model. 
@@ -110,7 +174,10 @@ hyperparameters_ranger <- c("mtry","splitrule")
 
 hyperparameters_svm <- c("C","sigma")
 
-model$results %>% tidyr::unite(col= a_l, hyperparameters_svm,sep="_") %>%
+hyperparameters_catboost <- c("learning_rate","depth")
+
+
+model$results %>% tidyr::unite(col= a_l, hyperparameters_catboost,sep="_") %>%
   ggplot(aes(x = a_l, y = RMSE)) +
   geom_point(color = 'red') +
   geom_errorbar(
